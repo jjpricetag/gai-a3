@@ -6,8 +6,6 @@ needed.
 Examples:
   python run_experiment.py --level 1 --algorithm qlearning --out logs/level1_qlearning.csv
   python run_experiment.py --level 1 --algorithm sarsa --out logs/level1_sarsa.csv
-  python run_experiment.py --level 6 --algorithm qlearning --intrinsic --out logs/level6_intrinsic.csv
-  python run_experiment.py --level 6 --algorithm qlearning --out logs/level6_no_intrinsic.csv
 """
 import argparse
 import os
@@ -27,8 +25,6 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--level", type=int, required=True)
     parser.add_argument("--algorithm", choices=["qlearning", "sarsa"], required=True)
-    parser.add_argument("--intrinsic", action="store_true", help="enable intrinsic reward")
-    parser.add_argument("--intrinsic-strength", type=float, default=1.0)
     parser.add_argument("--episodes", type=int, default=None, help="override config episodes")
     parser.add_argument("--out", required=True, help="CSV output path")
     args = parser.parse_args()
@@ -52,8 +48,6 @@ def main():
         env, cfg, screen, clock, font,
         title=f"Level {args.level}",
         algorithm=args.algorithm,
-        use_intrinsic_reward=args.intrinsic,
-        intrinsic_strength=args.intrinsic_strength,
         render=False,
         episode_callback=logger.record,
     )

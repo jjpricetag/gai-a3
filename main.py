@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """GridWorld RL - main menu.
 
-Title screen -> Play / Exit. Play -> pick a level -> (if the level supports
-both algorithms) pick Q-Learning or SARSA -> training runs in its own window.
+Title screen -> Play / Exit. Play -> pick a level -> (Levels 2-3 only)
+pick Q-Learning or SARSA -> training runs in its own window.
 """
 import os
 import random
@@ -17,26 +17,20 @@ from gridworld.ui import Button
 
 MENU, LEVEL_SELECT, ALGO_SELECT = "menu", "level_select", "algo_select"
 
-WINDOW_SIZE = (640, 560)
-NUM_LEVEL_BUTTONS = 7
+WINDOW_SIZE = (640, 420)
+NUM_LEVEL_BUTTONS = 4
 COL_BG = (25, 28, 34)
 COL_TEXT = (240, 240, 240)
 
 # Levels 0 and 1 use one fixed algorithm per the spec (Task 1 / Task 2).
-# Levels 2-6 let you pick either, to compare them (Task 3/4/5).
+# Levels 2-3 let you pick either, to compare them (Task 3).
 LEVEL_FIXED_ALGORITHM = {0: "qlearning", 1: "sarsa"}
 LEVEL_TITLES = {
     0: "Level 0 - Q-Learning",
     1: "Level 1 - SARSA",
     2: "Level 2 - Key & Chest",
     3: "Level 3 - Key & Chest+",
-    4: "Level 4 - Monsters",
-    5: "Level 5 - Monsters+",
-    6: "Level 6 - Intrinsic Reward",
 }
-# Level 6 defaults to using intrinsic reward; every level can still override
-# this via its own config file's "useIntrinsicReward" key.
-LEVEL_INTRINSIC_DEFAULT = {6: True}
 
 
 def run_level(level_id: int, algorithm: str, clock) -> bool:
@@ -53,16 +47,11 @@ def run_level(level_id: int, algorithm: str, clock) -> bool:
     pygame.display.set_caption(f"GridWorld - {LEVEL_TITLES[level_id]} ({algorithm})")
     font = pygame.font.SysFont("consolas", 18)
 
-    use_intrinsic = bool(cfg.get("useIntrinsicReward", LEVEL_INTRINSIC_DEFAULT.get(level_id, False)))
-    intrinsic_strength = float(cfg.get("intrinsicRewardStrength", 1.0))
-
     env = GridWorld(layout)
     return run_training(
         env, cfg, screen, clock, font,
         title=LEVEL_TITLES[level_id],
         algorithm=algorithm,
-        use_intrinsic_reward=use_intrinsic,
-        intrinsic_strength=intrinsic_strength,
     )
 
 

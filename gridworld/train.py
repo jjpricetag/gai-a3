@@ -1,5 +1,3 @@
-import math
-
 import pygame
 
 from .agents import QTable, epsilon_greedy, linear_epsilon, q_learning_update, sarsa_update
@@ -15,16 +13,14 @@ def run_training(
     font,
     title: str,
     algorithm: str = "qlearning",
-    use_intrinsic_reward: bool = False,
-    intrinsic_strength: float = 1.0,
     render: bool = True,
     episode_callback=None,
 ) -> bool:
     """Runs Q-learning or SARSA training for `env`. Returns True if the user closed the window.
 
     render=False skips all drawing so training runs at full speed (for generating
-    report evidence). episode_callback(episode, env_return, total_return, steps,
-    epsilon), if given, is called once at the end of each completed episode.
+    report evidence). episode_callback(episode, env_return, steps, epsilon), if
+    given, is called once at the end of each completed episode.
     """
     assert algorithm in ("qlearning", "sarsa")
 
@@ -41,8 +37,7 @@ def run_training(
 
     for ep in range(episodes):
         s = env.reset()
-        visit_counts = {}
-        env_return, total_return, steps = 0.0, 0.0, 0
+        env_return, steps = 0.0, 0
         eps = linear_epsilon(ep, eps_start, eps_end, eps_decay_ep)
         a = epsilon_greedy(qtab, s, eps) if algorithm == "sarsa" else None
 
@@ -57,8 +52,7 @@ def run_training(
                     if event.key == pygame.K_r:
                         qtab = QTable()
                         s = env.reset()
-                        visit_counts = {}
-                        env_return, total_return, steps = 0.0, 0.0, 0
+                        env_return, steps = 0.0, 0
                         eps = linear_epsilon(ep, eps_start, eps_end, eps_decay_ep)
                         a = epsilon_greedy(qtab, s, eps) if algorithm == "sarsa" else None
             if not running:
@@ -68,23 +62,15 @@ def run_training(
                 a = epsilon_greedy(qtab, s, eps)
             res = env.step(a)
 
-            reward_for_update = res.reward
-            if use_intrinsic_reward:
-                n_prior = visit_counts.get(s, 0)
-                intrinsic = intrinsic_strength / math.sqrt(n_prior + 1)
-                visit_counts[s] = n_prior + 1
-                reward_for_update += intrinsic
-
             if algorithm == "qlearning":
-                q_learning_update(qtab, s, a, reward_for_update, res.next_state, alpha, gamma, done=res.done)
+                q_learning_update(qtab, s, a, res.reward, res.next_state, alpha, gamma, done=res.done)
                 s = res.next_state
             else:  # sarsa
                 ap = epsilon_greedy(qtab, res.next_state, eps)
-                sarsa_update(qtab, s, a, reward_for_update, res.next_state, ap, alpha, gamma, done=res.done)
+                sarsa_update(qtab, s, a, res.reward, res.next_state, ap, alpha, gamma, done=res.done)
                 s, a = res.next_state, ap
 
             env_return += res.reward
-            total_return += reward_for_update
             steps += 1
 
             if render:
@@ -93,9 +79,7 @@ def run_training(
                     f"Apples left {bin(env.apple_mask).count('1')}"
                     + (f"  Chests left {bin(env.chest_mask).count('1')}" if env.chests else "")
                     + (f"  Keys {env.key_count}" if env.key_positions else ""),
-                    f"Return {env_return:.2f}"
-                    + (f"  (+intrinsic {total_return:.2f})" if use_intrinsic_reward else "")
-                    + f"  {title}",
+                    f"Return {env_return:.2f}  {title}",
                     "V toggles fast mode. R resets.",
                 ]
                 if visualize:
@@ -112,7 +96,7 @@ def run_training(
                 break
 
         if running and episode_callback is not None:
-            episode_callback(ep, env_return, total_return, steps, eps)
+            episode_callback(ep, env_return, steps, eps)
 
         if not running:
             break

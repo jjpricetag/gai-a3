@@ -1,4 +1,3 @@
-import random
 from dataclasses import dataclass
 from typing import List, Tuple
 
@@ -7,23 +6,17 @@ ACTIONS = [(0, -1), (1, 0), (0, 1), (-1, 0)]
 A_UP, A_RIGHT, A_DOWN, A_LEFT = 0, 1, 2, 3
 ALL_ACTIONS = [A_UP, A_RIGHT, A_DOWN, A_LEFT]
 
-DEFAULT_MONSTER_MOVE_PROB = 0.4
-
 # The spec defines rewards for apples/keys/chests but leaves death unvalued.
 # Without a negative reward there, Q-learning/SARSA see death as equivalent
 # to any other zero-reward step, so nothing steers the policy away from
 # hazards - which makes Task 2's "SARSA is more conservative near hazards"
-# comparison and Task 4's "learn to avoid monsters" impossible to satisfy.
+# comparison impossible to satisfy.
 DEATH_REWARD = -1.0
 
 
 @dataclass
 class StepResult:
     # (agent_x, agent_y, apple_mask, chest_mask, key_count)
-    # Monster positions are intentionally left out of the state: including every
-    # monster's cell would blow up the tabular state space combinatorially, and
-    # model-free Q-learning/SARSA already handle stochastic transitions without
-    # needing to observe the exact cause of the randomness.
     next_state: Tuple[int, int, int, int, int]
     reward: float
     done: bool
@@ -34,13 +27,11 @@ class GridWorld:
     def __init__(self, layout: List[str]):
         self.layout = layout
         self.w, self.h = len(layout[0]), len(layout)
-        self.monster_move_prob = DEFAULT_MONSTER_MOVE_PROB
 
         self.rocks, self.fires = set(), set()
         self.apples, self.apple_index = [], {}
         self.key_positions = []
         self.chests, self.chest_index = [], {}
-        self.monster_starts = []
         self.start = (0, 0)
 
         for y, row in enumerate(layout):
@@ -60,8 +51,6 @@ class GridWorld:
                 elif ch == "C":
                     self.chest_index[p] = len(self.chests)
                     self.chests.append(p)
-                elif ch == "M":
-                    self.monster_starts.append(p)
         self.reset()
 
     def reset(self) -> Tuple[int, int, int, int, int]:
@@ -73,7 +62,6 @@ class GridWorld:
         self.chest_mask = self._full_mask(len(self.chests))
         self.keys_remaining = set(self.key_positions)
         self.key_count = 0
-        self.monster_positions = list(self.monster_starts)
         return self.encode_state()
 
     @staticmethod
@@ -99,15 +87,6 @@ class GridWorld:
             return p
         return np_
 
-    def _move_monsters(self):
-        new_positions = []
-        for m in self.monster_positions:
-            if random.random() < self.monster_move_prob:
-                choices = [c for c in (self.try_move(m, a) for a in ALL_ACTIONS)]
-                m = random.choice(choices)
-            new_positions.append(m)
-        self.monster_positions = new_positions
-
     def step(self, action: int) -> StepResult:
         self.step_count += 1
         reward = 0.0
@@ -115,8 +94,8 @@ class GridWorld:
         # 1) move the agent
         self.agent = self.try_move(self.agent, action)
 
-        # 2) death: fire or a monster tile
-        if self.agent in self.fires or self.agent in self.monster_positions:
+        # 2) death: fire tile
+        if self.agent in self.fires:
             self.alive = False
             return StepResult(self.encode_state(), reward + DEATH_REWARD, True, {"event": "death"})
 
@@ -140,13 +119,6 @@ class GridWorld:
                 self.key_count -= 1
                 reward += 2.0
 
-        # 6) monsters move, then re-check death (a monster stepping onto the agent)
-        if self.monster_positions:
-            self._move_monsters()
-            if self.agent in self.monster_positions:
-                self.alive = False
-                return StepResult(self.encode_state(), reward + DEATH_REWARD, True, {"event": "death"})
-
-        # 7) episode ends once every collectible reward is gone
+        # 6) episode ends once every collectible reward is gone
         done = self.apple_mask == 0 and self.chest_mask == 0
         return StepResult(self.encode_state(), reward, done, {})

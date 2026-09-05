@@ -1,7 +1,9 @@
 # A3 - GridWorld RL (Part I)
 
-Q-learning and SARSA in a visual Pygame gridworld, covering Tasks 1-5 of the
+Q-learning and SARSA in a visual Pygame gridworld, covering Tasks 1-3 of the
 assignment spec ([spec.md](spec.md), rubric in [rubric.md](rubric.md)).
+Tasks 4 (monster levels) and 5 (intrinsic reward) are out of scope for this
+project.
 
 ## Setup
 
@@ -15,8 +17,8 @@ pip install -r requirements.txt
 python main.py
 ```
 
-Title screen -> **Play** -> pick a level -> (Levels 2-6 only) pick **Q-Learning**
-or **SARSA** -> training runs live in a Pygame window.
+Title screen -> **Play** -> pick a level -> (Levels 2-3 only) pick
+**Q-Learning** or **SARSA** -> training runs live in a Pygame window.
 
 **Controls during training:** `V` toggles fast/visual mode, `R` resets the
 current run, closing the window quits the app.
@@ -29,9 +31,6 @@ current run, closing the window quits the app.
 | 1 | 2 | Cliff-walk layout (fire row = short path, safe route over the top) | SARSA (fixed) |
 | 2 | 3 | Multiple apples, key, chest | Q-learning or SARSA |
 | 3 | 3 | Same as Level 2 + rocks (longer route) | Q-learning or SARSA |
-| 4 | 4 | Apples + wandering monsters (40% move chance/step) | Q-learning or SARSA |
-| 5 | 4 | Monsters + key/chest combined | Q-learning or SARSA |
-| 6 | 5 | Long winding maze, intrinsic reward on by default | Q-learning or SARSA |
 
 Level 1's layout is deliberately the classic "cliff walk": the shortest path
 runs beside instant-death fire tiles, and there's a longer safe route above
@@ -45,11 +44,10 @@ identical policies.
   assigns one to death. Leaving it at 0 (same as any non-rewarding step)
   makes death indistinguishable from an ordinary move, so Q-learning/SARSA
   have no gradient pushing them away from hazards - which makes Task 2's
-  "SARSA is more conservative near hazards" comparison, and Task 4's "learn
-  to avoid monsters," impossible to actually demonstrate. `DEATH_REWARD =
-  -1.0` in [gridworld/env.py](gridworld/env.py) fills that gap; it's an
-  addition where the spec is silent, not a change to a value the spec
-  specifies.
+  "SARSA is more conservative near hazards" comparison impossible to actually
+  demonstrate. `DEATH_REWARD = -1.0` in [gridworld/env.py](gridworld/env.py)
+  fills that gap; it's an addition where the spec is silent, not a change to
+  a value the spec specifies.
 - **Terminal-state masking.** Both update rules zero out the bootstrap term
   (`gamma * Q(next_state)`) when the transition ends the episode - a
   terminal state has no future reward to bootstrap from. Missing this made
@@ -73,7 +71,7 @@ gridworld/
   ui.py             Menu Button widget
   logging_utils.py  Per-episode CSV logger
 config/
-  config_level0.json ... config_level6.json   Per-level training parameters
+  config_level0.json ... config_level3.json   Per-level training parameters
 main.py             Game entry point (menu -> level -> training)
 run_experiment.py   Headless training run -> CSV (for report evidence)
 plot_curves.py      Overlay CSVs into a comparison PNG
@@ -98,8 +96,6 @@ falls back to the default. Missing file = defaults are used.
 | `fpsVisual` / `fpsFast` | Render speed caps for the two visualize modes (game only) |
 | `tileSize` | Pixel size per grid cell (visual only) |
 | `seed` | RNG seed, for reproducible runs |
-| `useIntrinsicReward` | Enables the Task 5 intrinsic reward bonus (Level 6 only by default) |
-| `intrinsicRewardStrength` | Strength coefficient in `r_i = strength / sqrt(n(s)+1)` |
 
 ## Generating report evidence (training curves)
 
@@ -112,12 +108,6 @@ python run_experiment.py --level 1 --algorithm sarsa --out logs/level1_sarsa.csv
 ```
 
 `--episodes N` overrides the config's episode count without editing the file.
-For Level 6's intrinsic-reward comparison, `--intrinsic` toggles the bonus:
-
-```bash
-python run_experiment.py --level 6 --algorithm qlearning --intrinsic --out logs/level6_intrinsic.csv
-python run_experiment.py --level 6 --algorithm qlearning --out logs/level6_no_intrinsic.csv
-```
 
 Then overlay any set of CSVs into one comparison plot:
 
@@ -128,7 +118,8 @@ python plot_curves.py logs/level1_qlearning.csv:Q-learning logs/level1_sarsa.csv
 
 ## Status
 
-- **Part I:** implemented - gridworld, Q-learning, SARSA, Levels
-  0-6, intrinsic reward, config-driven training, evidence pipeline.
+- **Part I:** implemented - gridworld, Q-learning, SARSA, Levels 0-3,
+  config-driven training, evidence pipeline. Tasks 4/5 (monsters, intrinsic
+  reward) intentionally out of scope.
 - **Part II (deep RL arena):** not started yet.
 - **Report / video demo:** not started yet.
