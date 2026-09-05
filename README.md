@@ -128,7 +128,7 @@ python plot_curves.py logs/level1_qlearning.csv:Q-learning logs/level1_sarsa.csv
 
 ## Status
 
-- **Part I (this repo):** implemented - gridworld, Q-learning, SARSA, Levels
+- **Part I:** implemented - gridworld, Q-learning, SARSA, Levels
   0-6, intrinsic reward, config-driven training, evidence pipeline.
 - **Part II (deep RL arena):** not started yet.
 - **Report / video demo:** not started yet.
