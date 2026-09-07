@@ -1,7 +1,7 @@
 pygame>=2.6
 matplotlib>=3.9
 
-# Part II (deep RL arena) - not yet implemented, uncomment when you start it:
-# stable-baselines3>=2.3
-# gymnasium>=0.29
-# tensorboard>=2.16
+# Part II (deep RL arena)
+stable-baselines3>=2.3
+gymnasium>=0.29
+tensorboard>=2.16
