@@ -33,7 +33,7 @@ def read_direct():
 
 
 def main():
-    style = "rotation" if "--style" in sys.argv and "rotation" in sys.argv else "direct"
+    style = "direct" if "--style" in sys.argv and "direct" in sys.argv else "rotation"
 
     pg.init()
     screen = pg.display.set_mode((WIDTH, HEIGHT))

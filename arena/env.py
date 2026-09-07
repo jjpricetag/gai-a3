@@ -1,0 +1,172 @@
+import math
+
+import gymnasium as gym
+import numpy as np
+from gymnasium import spaces
+
+from arena.game import Game
+from arena.settings import (
+    ACTION_REPEAT, DT, FPS, HEIGHT, MAX_EPISODE_SECONDS, MAX_EPISODE_STEPS,
+    OBS_SIZE, PHASE_OBS_SCALE, PHASE_SPAWNERS_MAX, PLAYER_MAX_SPEED,
+    REWARD_DAMAGE, REWARD_DEATH, REWARD_ENEMY, REWARD_HIT, REWARD_PHASE,
+    REWARD_SPAWNER, REWARD_STEP, SHOOT_COOLDOWN, WIDTH,
+)
+
+DIAGONAL = math.hypot(WIDTH, HEIGHT)
+
+ROTATION_ACTIONS = ("noop", "thrust", "rotate_left", "rotate_right", "shoot")
+DIRECT_ACTIONS = ("noop", "up", "down", "left", "right", "shoot")
+
+TRACKED = ("enemies_killed", "spawners_killed", "phase_advanced",
+           "damage_taken", "hits_landed")
+
+
+class ArenaEnv(gym.Env):
+    metadata = {"render_modes": ["human"], "render_fps": FPS}
+
+    def __init__(self, control_style="rotation", render_mode=None, seed=None,
+                 render_fps=None):
+        super().__init__()
+        if control_style not in ("rotation", "direct"):
+            raise ValueError("control_style must be 'rotation' or 'direct'")
+
+        self.control_style = control_style
+        self.actions = (ROTATION_ACTIONS if control_style == "rotation"
+                        else DIRECT_ACTIONS)
+        self.render_mode = render_mode
+        self.render_fps = render_fps
+
+        self.game = Game(seed=seed)
+        self.steps = 0
+
+        self._screen = None
+        self._font = None
+        self._clock = None
+
+        self.observation_space = spaces.Box(low=-1.0, high=1.0,
+                                            shape=(OBS_SIZE,), dtype=np.float32)
+        self.action_space = spaces.Discrete(len(self.actions))
+
+    def reset(self, *, seed=None, options=None):
+        super().reset(seed=seed)
+        if seed is not None:
+            self.game.rng.seed(seed)
+        self.game.reset()
+        self.steps = 0
+        return self._observe(), {}
+
+    def step(self, action):
+        inputs = self._inputs(int(action))
+        totals = dict.fromkeys(TRACKED, 0)
+
+        for _ in range(ACTION_REPEAT):
+            self.game.update(DT, **inputs)
+            for key in TRACKED:
+                totals[key] += self.game.events.get(key, 0)
+            if self.game.over:
+                break
+
+        self.steps += 1
+        terminated = self.game.player.hp <= 0
+        truncated = (not terminated) and (self.game.over
+                                          or self.steps >= MAX_EPISODE_STEPS)
+        reward = self._reward(totals, terminated)
+
+        info = dict(totals)
+        info["phase"] = self.game.phase
+        info["time"] = self.game.time
+
+        if self.render_mode == "human":
+            self.render()
+
+        return self._observe(), reward, terminated, truncated, info
+
+    def _inputs(self, action):
+        name = self.actions[action]
+        if self.control_style == "rotation":
+            return {
+                "rotate": -1.0 if name == "rotate_left" else
+                          1.0 if name == "rotate_right" else 0.0,
+                "thrust": name == "thrust",
+                "shoot": name == "shoot",
+            }
+        move = {"up": (0.0, -1.0), "down": (0.0, 1.0),
+                "left": (-1.0, 0.0), "right": (1.0, 0.0)}.get(name, (0.0, 0.0))
+        return {"move": move, "shoot": name == "shoot"}
+
+    def _reward(self, totals, terminated):
+        reward = REWARD_STEP
+        reward += REWARD_HIT * totals["hits_landed"]
+        reward += REWARD_ENEMY * totals["enemies_killed"]
+        reward += REWARD_SPAWNER * totals["spawners_killed"]
+        reward += REWARD_PHASE * totals["phase_advanced"]
+        reward += REWARD_DAMAGE * totals["damage_taken"]
+        if terminated:
+            reward += REWARD_DEATH
+        return float(reward)
+
+    def _relative(self, target):
+        if target is None:
+            return 0.0, 0.0, 1.0
+        dx = (target.x - self.game.player.x) / WIDTH
+        dy = (target.y - self.game.player.y) / HEIGHT
+        dist = math.hypot(target.x - self.game.player.x,
+                          target.y - self.game.player.y) / DIAGONAL
+        return dx, dy, dist
+
+    def _observe(self):
+        p = self.game.player
+        enemy_dx, enemy_dy, enemy_dist = self._relative(self.game.nearest_enemy())
+        spawn_dx, spawn_dy, spawn_dist = self._relative(self.game.nearest_spawner())
+
+        obs = np.array([
+            p.x / WIDTH * 2.0 - 1.0,
+            p.y / HEIGHT * 2.0 - 1.0,
+            p.vx / PLAYER_MAX_SPEED,
+            p.vy / PLAYER_MAX_SPEED,
+            math.sin(p.angle),
+            math.cos(p.angle),
+            p.hp / p.max_hp,
+            enemy_dx,
+            enemy_dy,
+            enemy_dist,
+            spawn_dx,
+            spawn_dy,
+            spawn_dist,
+            len(self.game.enemies) / self.game.max_enemies(),
+            len(self.game.spawners) / PHASE_SPAWNERS_MAX,
+            min(self.game.phase / PHASE_OBS_SCALE, 1.0),
+            p.cooldown / SHOOT_COOLDOWN,
+            1.0 - self.game.time / MAX_EPISODE_SECONDS,
+        ], dtype=np.float32)
+
+        return np.clip(obs, -1.0, 1.0)
+
+    def render(self):
+        if self.render_mode != "human":
+            return
+        import pygame as pg
+
+        from arena.render import draw
+
+        if self._screen is None:
+            pg.init()
+            self._screen = pg.display.set_mode((WIDTH, HEIGHT))
+            pg.display.set_caption("Arena - {}".format(self.control_style))
+            self._font = pg.font.SysFont("consolas", 16)
+            self._clock = pg.time.Clock()
+            if self.render_fps is None:
+                self.render_fps = FPS / ACTION_REPEAT
+
+        pg.event.pump()
+        draw(self._screen, self._font, self.game)
+        pg.display.flip()
+        if self.render_fps:
+            self._clock.tick(self.render_fps)
+
+    def close(self):
+        if self._screen is not None:
+            import pygame as pg
+            pg.display.quit()
+            pg.quit()
+            self._screen = None

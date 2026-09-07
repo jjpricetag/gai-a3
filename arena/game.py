@@ -70,7 +70,8 @@ class Game:
             return
 
         self.events = {"enemies_killed": 0, "spawners_killed": 0,
-                       "phase_advanced": 0, "damage_taken": 0, "shots_fired": 0}
+                       "phase_advanced": 0, "damage_taken": 0,
+                       "shots_fired": 0, "hits_landed": 0}
 
         self.time += dt
         self.contact_timer = max(0.0, self.contact_timer - dt)
@@ -106,6 +107,7 @@ class Game:
             for e in self.enemies:
                 if e.hp > 0 and b.rect().colliderect(e.rect()):
                     e.hp -= 1
+                    self.events["hits_landed"] += 1
                     if e.hp <= 0:
                         self.events["enemies_killed"] += 1
                     hit = True
@@ -114,6 +116,7 @@ class Game:
                 for s in self.spawners:
                     if s.hp > 0 and b.rect().colliderect(s.rect()):
                         s.hp -= 1
+                        self.events["hits_landed"] += 1
                         if s.hp <= 0:
                             self.events["spawners_killed"] += 1
                         hit = True
