@@ -23,6 +23,35 @@ class QTable:
         return [a for a, v in zip(ALL_ACTIONS, vals) if v == m]
 
 
+class VisitCounter:
+    """Tracks visit counts per state for intrinsic reward calculation."""
+    def __init__(self):
+        self.counts: Dict[Tuple, int] = {}
+
+    def visit(self, s):
+        """Increment visit count for state s and return the new count."""
+        self.counts[s] = self.counts.get(s, 0) + 1
+        return self.counts[s]
+
+    def get_count(self, s):
+        """Get the current visit count for state s."""
+        return self.counts.get(s, 0)
+
+    def reset(self):
+        """Reset all counts (called at start of each episode)."""
+        self.counts.clear()
+
+
+def compute_intrinsic_reward(visit_count, intrinsic_strength):
+    """Compute intrinsic reward based on visit count.
+
+    Formula: r_i = intrinsic_strength / sqrt(n(s) + 1)
+    where n(s) is the visit count for the current state.
+    """
+    import math
+    return intrinsic_strength / math.sqrt(visit_count + 1)
+
+
 def linear_epsilon(ep, start, end, decay_ep):
     if decay_ep <= 0:
         return end

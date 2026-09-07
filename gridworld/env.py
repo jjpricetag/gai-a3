@@ -24,14 +24,16 @@ class StepResult:
 
 
 class GridWorld:
-    def __init__(self, layout: List[str]):
+    def __init__(self, layout: List[str], monster_move_prob: float = 0.4):
         self.layout = layout
         self.w, self.h = len(layout[0]), len(layout)
+        self.monster_move_prob = monster_move_prob
 
         self.rocks, self.fires = set(), set()
         self.apples, self.apple_index = [], {}
         self.key_positions = []
         self.chests, self.chest_index = [], {}
+        self.monsters, self.monster_index = [], {}
         self.start = (0, 0)
 
         for y, row in enumerate(layout):
@@ -51,6 +53,9 @@ class GridWorld:
                 elif ch == "C":
                     self.chest_index[p] = len(self.chests)
                     self.chests.append(p)
+                elif ch == "M":
+                    self.monster_index[p] = len(self.monsters)
+                    self.monsters.append(p)
         self.reset()
 
     def reset(self) -> Tuple[int, int, int, int, int]:
@@ -62,6 +67,7 @@ class GridWorld:
         self.chest_mask = self._full_mask(len(self.chests))
         self.keys_remaining = set(self.key_positions)
         self.key_count = 0
+        self.monster_positions = list(self.monsters)
         return self.encode_state()
 
     @staticmethod
@@ -87,6 +93,24 @@ class GridWorld:
             return p
         return np_
 
+    def _move_monsters(self):
+        """Move monsters with probability monster_move_prob.
+        Each monster independently has a chance to move randomly to an adjacent tile.
+        If a monster moves into the agent, the agent dies.
+        """
+        import random
+        for i, monster_pos in enumerate(self.monster_positions):
+            if random.random() < self.monster_move_prob:
+                possible_moves = []
+                for action in ALL_ACTIONS:
+                    new_pos = self.try_move(monster_pos, action)
+                    possible_moves.append(new_pos)
+
+                self.monster_positions[i] = random.choice(possible_moves)
+
+                if self.monster_positions[i] == self.agent:
+                    self.alive = False
+
     def step(self, action: int) -> StepResult:
         self.step_count += 1
         reward = 0.0
@@ -99,19 +123,24 @@ class GridWorld:
             self.alive = False
             return StepResult(self.encode_state(), reward + DEATH_REWARD, True, {"event": "death"})
 
-        # 3) apple collection
+        # 3) death: monster collision (agent walks into monster)
+        if self.agent in self.monster_positions:
+            self.alive = False
+            return StepResult(self.encode_state(), reward + DEATH_REWARD, True, {"event": "death"})
+
+        # 4) apple collection
         if self.agent in self.apple_index:
             idx = self.apple_index[self.agent]
             if (self.apple_mask >> idx) & 1:
                 self.apple_mask &= ~(1 << idx)
                 reward += 1.0
 
-        # 4) key pickup (no reward, just inventory)
+        # 5) key pickup (no reward, just inventory)
         if self.agent in self.keys_remaining:
             self.keys_remaining.discard(self.agent)
             self.key_count += 1
 
-        # 5) chest opening (needs a key)
+        # 6) chest opening (needs a key)
         if self.agent in self.chest_index:
             idx = self.chest_index[self.agent]
             if (self.chest_mask >> idx) & 1 and self.key_count > 0:
@@ -119,6 +148,14 @@ class GridWorld:
                 self.key_count -= 1
                 reward += 2.0
 
-        # 6) episode ends once every collectible reward is gone
+        # 7) move monsters (40% chance each to move randomly)
+        self._move_monsters()
+
+        # 8) death: monster moves into agent
+        if self.agent in self.monster_positions:
+            self.alive = False
+            return StepResult(self.encode_state(), reward + DEATH_REWARD, True, {"event": "death"})
+
+        # 9) episode ends once every collectible reward is gone
         done = self.apple_mask == 0 and self.chest_mask == 0
         return StepResult(self.encode_state(), reward, done, {})
