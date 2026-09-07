@@ -1,3 +1,5 @@
+import sys
+
 import pygame as pg
 
 from arena.game import Game
@@ -5,26 +7,37 @@ from arena.render import draw
 from arena.settings import DT, FPS, HEIGHT, WIDTH
 
 
-def read_input():
+def read_rotation():
     keys = pg.key.get_pressed()
-    move_x = 0.0
-    move_y = 0.0
+    rotate = 0.0
     if keys[pg.K_a] or keys[pg.K_LEFT]:
-        move_x -= 1.0
+        rotate -= 1.0
     if keys[pg.K_d] or keys[pg.K_RIGHT]:
-        move_x += 1.0
+        rotate += 1.0
+    thrust = keys[pg.K_w] or keys[pg.K_UP]
+    return {"rotate": rotate, "thrust": thrust, "shoot": keys[pg.K_SPACE]}
+
+
+def read_direct():
+    keys = pg.key.get_pressed()
+    dx = dy = 0.0
+    if keys[pg.K_a] or keys[pg.K_LEFT]:
+        dx -= 1.0
+    if keys[pg.K_d] or keys[pg.K_RIGHT]:
+        dx += 1.0
     if keys[pg.K_w] or keys[pg.K_UP]:
-        move_y -= 1.0
+        dy -= 1.0
     if keys[pg.K_s] or keys[pg.K_DOWN]:
-        move_y += 1.0
-    shooting = keys[pg.K_SPACE]
-    return move_x, move_y, shooting, pg.mouse.get_pos()
+        dy += 1.0
+    return {"move": (dx, dy), "shoot": keys[pg.K_SPACE]}
 
 
 def main():
+    style = "rotation" if "--style" in sys.argv and "rotation" in sys.argv else "direct"
+
     pg.init()
     screen = pg.display.set_mode((WIDTH, HEIGHT))
-    pg.display.set_caption("Arena")
+    pg.display.set_caption("Arena - {}".format(style))
     clock = pg.time.Clock()
     font = pg.font.SysFont("consolas", 16)
 
@@ -41,8 +54,8 @@ def main():
                 elif event.key == pg.K_r:
                     game.reset()
 
-        move_x, move_y, shooting, aim = read_input()
-        game.update(DT, move_x, move_y, shooting, aim)
+        inputs = read_direct() if style == "direct" else read_rotation()
+        game.update(DT, **inputs)
 
         draw(screen, font, game)
         pg.display.flip()

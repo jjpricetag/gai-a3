@@ -6,8 +6,9 @@ import pygame as pg
 from arena.settings import (
     BULLET_R, BULLET_SPEED, ENEMY_CHASE_RADIUS, ENEMY_H, ENEMY_HP,
     ENEMY_LOSE_RADIUS, ENEMY_PATROL_RANGE, ENEMY_PATROL_TIME, ENEMY_SPEED,
-    ENEMY_W, HEIGHT, PLAYER_H, PLAYER_HP, PLAYER_SPEED, PLAYER_W,
-    SHOOT_COOLDOWN, WIDTH,
+    ENEMY_W, HEIGHT, PLAYER_DIRECT_SPEED, PLAYER_DRAG, PLAYER_H, PLAYER_HP,
+    PLAYER_MAX_SPEED, PLAYER_RADIUS, PLAYER_THRUST, PLAYER_TURN_RATE,
+    PLAYER_W, SHOOT_COOLDOWN, SPAWNER_HP, SPAWNER_SIZE, WIDTH,
 )
 
 
@@ -42,38 +43,67 @@ class Player:
         self.y = y
         self.w = PLAYER_W
         self.h = PLAYER_H
+        self.radius = PLAYER_RADIUS
+        self.angle = -math.pi / 2
         self.vx = 0.0
         self.vy = 0.0
-        self.speed = PLAYER_SPEED
         self.max_hp = PLAYER_HP
         self.hp = PLAYER_HP
         self.cooldown = 0.0
 
-    def update(self, dt, move_x, move_y, shooting, aim, bullets):
-        if move_x and move_y:
-            move_x *= 0.7071
-            move_y *= 0.7071
+    def rotate(self, direction, dt):
+        self.angle += direction * PLAYER_TURN_RATE * dt
+        if self.angle > math.pi:
+            self.angle -= 2.0 * math.pi
+        elif self.angle < -math.pi:
+            self.angle += 2.0 * math.pi
 
-        self.vx = move_x * self.speed
-        self.vy = move_y * self.speed
+    def thrust(self, dt):
+        self.vx += math.cos(self.angle) * PLAYER_THRUST * dt
+        self.vy += math.sin(self.angle) * PLAYER_THRUST * dt
 
-        self.x = clamp(self.x + self.vx * dt, self.w * 0.5, WIDTH - self.w * 0.5)
-        self.y = clamp(self.y + self.vy * dt, self.h * 0.5, HEIGHT - self.h * 0.5)
-
-        self.cooldown = max(0.0, self.cooldown - dt)
-        if shooting and self.cooldown <= 0.0:
-            ax, ay = aim
-            dx = ax - self.x
-            dy = ay - self.y
+    def move_direct(self, dx, dy):
+        if dx or dy:
             length = math.hypot(dx, dy)
-            if length < 1e-6:
-                dx, dy, length = 1.0, 0.0, 1.0
             dx /= length
             dy /= length
-            bullets.append(Bullet(self.x, self.y,
-                                  dx * BULLET_SPEED, dy * BULLET_SPEED,
-                                  "player"))
-            self.cooldown = SHOOT_COOLDOWN
+            self.vx = dx * PLAYER_DIRECT_SPEED
+            self.vy = dy * PLAYER_DIRECT_SPEED
+            self.angle = math.atan2(dy, dx)
+        else:
+            self.vx = 0.0
+            self.vy = 0.0
+
+    def shoot(self, bullets):
+        if self.cooldown > 0.0:
+            return False
+        dx = math.cos(self.angle)
+        dy = math.sin(self.angle)
+        bullets.append(Bullet(self.x + dx * self.radius,
+                              self.y + dy * self.radius,
+                              dx * BULLET_SPEED, dy * BULLET_SPEED,
+                              "player"))
+        self.cooldown = SHOOT_COOLDOWN
+        return True
+
+    def integrate(self, dt, drag=True):
+        if drag:
+            factor = max(0.0, 1.0 - PLAYER_DRAG * dt)
+            self.vx *= factor
+            self.vy *= factor
+
+        speed = math.hypot(self.vx, self.vy)
+        if speed > PLAYER_MAX_SPEED:
+            scale = PLAYER_MAX_SPEED / speed
+            self.vx *= scale
+            self.vy *= scale
+
+        self.x = clamp(self.x + self.vx * dt, self.radius, WIDTH - self.radius)
+        self.y = clamp(self.y + self.vy * dt, self.radius, HEIGHT - self.radius)
+        self.cooldown = max(0.0, self.cooldown - dt)
+
+    def speed(self):
+        return math.hypot(self.vx, self.vy)
 
     def rect(self):
         r = pg.Rect(0, 0, self.w, self.h)
@@ -135,5 +165,28 @@ class Enemy:
 
     def rect(self):
         r = pg.Rect(0, 0, self.w, self.h)
+        r.center = (int(self.x), int(self.y))
+        return r
+
+
+class Spawner:
+    def __init__(self, x, y, interval):
+        self.x = x
+        self.y = y
+        self.size = SPAWNER_SIZE
+        self.max_hp = SPAWNER_HP
+        self.hp = SPAWNER_HP
+        self.interval = interval
+        self.timer = interval * 0.5
+
+    def update(self, dt):
+        self.timer -= dt
+        if self.timer <= 0.0:
+            self.timer += self.interval
+            return True
+        return False
+
+    def rect(self):
+        r = pg.Rect(0, 0, self.size, self.size)
         r.center = (int(self.x), int(self.y))
         return r
