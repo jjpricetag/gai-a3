@@ -1,0 +1,11 @@
+{
+  "episodes": 1000,
+  "alpha": 0.12,
+  "gamma": 0.98,
+  "epsilonStart": 1.0,
+  "epsilonEnd": 0.05,
+  "epsilonDecayEpisodes": 500,
+  "maxStepsPerEpisode": 250,
+  "seed": 42,
+  "intrinsicRewardStrength": 0.5
+}
