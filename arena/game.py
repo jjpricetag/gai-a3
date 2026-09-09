@@ -3,12 +3,15 @@ import random
 
 from arena.entities import Enemy, Player, Spawner
 from arena.settings import (
-    ENEMY_CONTACT_DAMAGE_COOLDOWN, HEIGHT, MAX_ENEMIES_BASE,
+    AIM_TOLERANCE, ENEMY_CONTACT_DAMAGE_COOLDOWN, HEIGHT, MAX_ENEMIES_BASE,
     MAX_ENEMIES_PER_PHASE, MAX_EPISODE_SECONDS, PHASE_SPAWNERS_BASE,
     PHASE_SPAWNERS_MAX, SPAWN_INTERVAL_BASE, SPAWN_INTERVAL_MIN,
     SPAWN_INTERVAL_PER_PHASE, SPAWN_OFFSET, SPAWNER_MIN_PLAYER_DIST,
     SPAWNER_MIN_SEPARATION, WIDTH,
 )
+
+
+AIM_ON_TARGET = math.cos(AIM_TOLERANCE)
 
 
 class Game:
@@ -71,7 +74,8 @@ class Game:
 
         self.events = {"enemies_killed": 0, "spawners_killed": 0,
                        "phase_advanced": 0, "damage_taken": 0,
-                       "shots_fired": 0, "hits_landed": 0}
+                       "shots_fired": 0, "hits_landed": 0,
+                       "aimed_shots": 0, "aim_alignment": 0.0}
 
         self.time += dt
         self.contact_timer = max(0.0, self.contact_timer - dt)
@@ -88,6 +92,10 @@ class Game:
 
         if shoot and self.player.shoot(self.bullets):
             self.events["shots_fired"] = 1
+            alignment = self.aim_alignment()
+            self.events["aim_alignment"] = alignment
+            if alignment >= AIM_ON_TARGET:
+                self.events["aimed_shots"] = 1
 
         for s in self.spawners:
             if s.update(dt):
@@ -145,6 +153,14 @@ class Game:
             self.over = True
         if self.time >= MAX_EPISODE_SECONDS:
             self.over = True
+
+    def aim_alignment(self):
+        target = self._nearest(self.enemies + self.spawners)
+        if target is None:
+            return 0.0
+        want = math.atan2(target.y - self.player.y, target.x - self.player.x)
+        diff = (want - self.player.angle + math.pi) % (2.0 * math.pi) - math.pi
+        return max(0.0, math.cos(diff))
 
     def nearest_enemy(self):
         return self._nearest(self.enemies)

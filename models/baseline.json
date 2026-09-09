@@ -11,12 +11,5 @@
     64,
     64
   ],
-  "seed": 0,
-  "rewardStep": -0.01,
-  "rewardHit": 0.0,
-  "rewardEnemy": 1.0,
-  "rewardSpawner": 5.0,
-  "rewardPhase": 10.0,
-  "rewardDamage": -1.0,
-  "rewardDeath": -10.0
+  "seed": 0
 }

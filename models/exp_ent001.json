@@ -3,7 +3,7 @@
   "style": "rotation",
   "timesteps": 150000,
   "learningRate": 0.0003,
-  "entCoef": 0.0,
+  "entCoef": 0.01,
   "nSteps": 2048,
   "batchSize": 64,
   "gamma": 0.99,

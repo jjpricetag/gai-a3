@@ -18,14 +18,25 @@ ROTATION_ACTIONS = ("noop", "thrust", "rotate_left", "rotate_right", "shoot")
 DIRECT_ACTIONS = ("noop", "up", "down", "left", "right", "shoot")
 
 TRACKED = ("enemies_killed", "spawners_killed", "phase_advanced",
-           "damage_taken", "hits_landed")
+           "damage_taken", "hits_landed", "aimed_shots", "aim_alignment")
 
 
 class ArenaEnv(gym.Env):
     metadata = {"render_modes": ["human"], "render_fps": FPS}
 
+    DEFAULT_REWARDS = {
+        "rewardStep": REWARD_STEP,
+        "rewardHit": REWARD_HIT,
+        "rewardAim": 0.0,
+        "rewardEnemy": REWARD_ENEMY,
+        "rewardSpawner": REWARD_SPAWNER,
+        "rewardPhase": REWARD_PHASE,
+        "rewardDamage": REWARD_DAMAGE,
+        "rewardDeath": REWARD_DEATH,
+    }
+
     def __init__(self, control_style="rotation", render_mode=None, seed=None,
-                 render_fps=None):
+                 rewards=None):
         super().__init__()
         if control_style not in ("rotation", "direct"):
             raise ValueError("control_style must be 'rotation' or 'direct'")
@@ -34,7 +45,10 @@ class ArenaEnv(gym.Env):
         self.actions = (ROTATION_ACTIONS if control_style == "rotation"
                         else DIRECT_ACTIONS)
         self.render_mode = render_mode
-        self.render_fps = render_fps
+        self.rewards = dict(self.DEFAULT_REWARDS)
+        if rewards:
+            self.rewards.update({k: v for k, v in rewards.items()
+                                 if k in self.DEFAULT_REWARDS})
 
         self.game = Game(seed=seed)
         self.steps = 0
@@ -95,14 +109,16 @@ class ArenaEnv(gym.Env):
         return {"move": move, "shoot": name == "shoot"}
 
     def _reward(self, totals, terminated):
-        reward = REWARD_STEP
-        reward += REWARD_HIT * totals["hits_landed"]
-        reward += REWARD_ENEMY * totals["enemies_killed"]
-        reward += REWARD_SPAWNER * totals["spawners_killed"]
-        reward += REWARD_PHASE * totals["phase_advanced"]
-        reward += REWARD_DAMAGE * totals["damage_taken"]
+        r = self.rewards
+        reward = r["rewardStep"]
+        reward += r["rewardAim"] * totals["aim_alignment"]
+        reward += r["rewardHit"] * totals["hits_landed"]
+        reward += r["rewardEnemy"] * totals["enemies_killed"]
+        reward += r["rewardSpawner"] * totals["spawners_killed"]
+        reward += r["rewardPhase"] * totals["phase_advanced"]
+        reward += r["rewardDamage"] * totals["damage_taken"]
         if terminated:
-            reward += REWARD_DEATH
+            reward += r["rewardDeath"]
         return float(reward)
 
     def _relative(self, target):
@@ -155,14 +171,11 @@ class ArenaEnv(gym.Env):
             pg.display.set_caption("Arena - {}".format(self.control_style))
             self._font = pg.font.SysFont("consolas", 16)
             self._clock = pg.time.Clock()
-            if self.render_fps is None:
-                self.render_fps = FPS / ACTION_REPEAT
 
         pg.event.pump()
         draw(self._screen, self._font, self.game)
         pg.display.flip()
-        if self.render_fps:
-            self._clock.tick(self.render_fps)
+        self._clock.tick(FPS / ACTION_REPEAT)
 
     def close(self):
         if self._screen is not None:
