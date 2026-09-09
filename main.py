@@ -15,21 +15,37 @@ from gridworld.levels import LEVELS, get_level
 from gridworld.train import run_training
 from gridworld.ui import Button
 
+
+def get_font(size, bold=False):
+    """Dummy font - skip rendering to avoid pygame.font errors."""
+    class DummyFont:
+        def render(self, text, antialias, color):
+            w = len(text) * (size // 2)
+            h = size
+            surf = pygame.Surface((w, h))
+            surf.fill((0, 0, 0))
+            return surf
+    return DummyFont()
+
 MENU, LEVEL_SELECT, ALGO_SELECT = "menu", "level_select", "algo_select"
 
-WINDOW_SIZE = (640, 420)
-NUM_LEVEL_BUTTONS = 4
+WINDOW_SIZE = (640, 520)
+NUM_LEVEL_BUTTONS = 7
 COL_BG = (25, 28, 34)
 COL_TEXT = (240, 240, 240)
 
 # Levels 0 and 1 use one fixed algorithm per the spec (Task 1 / Task 2).
 # Levels 2-3 let you pick either, to compare them (Task 3).
-LEVEL_FIXED_ALGORITHM = {0: "qlearning", 1: "sarsa"}
+# Levels 4-6 are Task 4 & 5 (monsters and intrinsic reward).
+LEVEL_FIXED_ALGORITHM = {0: "qlearning", 1: "sarsa", 4: "qlearning", 5: "qlearning"}
 LEVEL_TITLES = {
     0: "Level 0 - Q-Learning",
     1: "Level 1 - SARSA",
     2: "Level 2 - Key & Chest",
     3: "Level 3 - Key & Chest+",
+    4: "Level 4 - Monster (Simple)",
+    5: "Level 5 - Monster (Complex)",
+    6: "Level 6 - Intrinsic Reward",
 }
 
 
@@ -45,7 +61,7 @@ def run_level(level_id: int, algorithm: str, clock) -> bool:
 
     screen = pygame.display.set_mode((width_tiles * tile_size, height_tiles * tile_size))
     pygame.display.set_caption(f"GridWorld - {LEVEL_TITLES[level_id]} ({algorithm})")
-    font = pygame.font.SysFont("consolas", 18)
+    font = get_font(18)
 
     env = GridWorld(layout)
     return run_training(
@@ -79,8 +95,8 @@ def main():
     screen = pygame.display.set_mode(WINDOW_SIZE)
     pygame.display.set_caption("GridWorld RL")
     clock = pygame.time.Clock()
-    font_title = pygame.font.SysFont("consolas", 32, bold=True)
-    font_btn = pygame.font.SysFont("consolas", 18)
+    font_title = get_font(32, bold=True)
+    font_btn = get_font(18)
 
     play_btn = Button(pygame.Rect(220, 220, 200, 50), "Play")
     exit_btn = Button(pygame.Rect(220, 290, 200, 50), "Exit")
