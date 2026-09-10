@@ -12,11 +12,14 @@ from arena.settings import (
 
 
 AIM_ON_TARGET = math.cos(AIM_TOLERANCE)
+FX_TIME = 0.45
+HURT_TIME = 0.35
 
 
 class Game:
-    def __init__(self, seed=None):
+    def __init__(self, seed=None, aim_target="nearest"):
         self.rng = random.Random(seed)
+        self.aim_target = aim_target
         self.reset()
 
     def reset(self):
@@ -28,6 +31,8 @@ class Game:
         self.time = 0.0
         self.over = False
         self.contact_timer = 0.0
+        self.fx = []
+        self.hurt = 0.0
         self.events = {}
         self._build_phase()
 
@@ -75,10 +80,15 @@ class Game:
         self.events = {"enemies_killed": 0, "spawners_killed": 0,
                        "phase_advanced": 0, "damage_taken": 0,
                        "shots_fired": 0, "hits_landed": 0,
-                       "aimed_shots": 0, "aim_alignment": 0.0}
+                       "spawner_hits": 0, "aimed_shots": 0,
+                       "aim_alignment": 0.0}
 
         self.time += dt
         self.contact_timer = max(0.0, self.contact_timer - dt)
+        self.hurt = max(0.0, self.hurt - dt)
+        for f in self.fx:
+            f[2] += dt
+        self.fx = [f for f in self.fx if f[2] < FX_TIME]
 
         if move is None:
             if rotate:
@@ -118,6 +128,7 @@ class Game:
                     self.events["hits_landed"] += 1
                     if e.hp <= 0:
                         self.events["enemies_killed"] += 1
+                        self.fx.append([e.x, e.y, 0.0])
                     hit = True
                     break
             if not hit:
@@ -125,8 +136,10 @@ class Game:
                     if s.hp > 0 and b.rect().colliderect(s.rect()):
                         s.hp -= 1
                         self.events["hits_landed"] += 1
+                        self.events["spawner_hits"] += 1
                         if s.hp <= 0:
                             self.events["spawners_killed"] += 1
+                            self.fx.append([s.x, s.y, 0.0])
                         hit = True
                         break
             if hit:
@@ -141,6 +154,7 @@ class Game:
                 if e.rect().colliderect(self.player.rect()):
                     self.player.hp -= 1
                     self.events["damage_taken"] = 1
+                    self.hurt = HURT_TIME
                     self.contact_timer = ENEMY_CONTACT_DAMAGE_COOLDOWN
                     break
 
@@ -155,7 +169,10 @@ class Game:
             self.over = True
 
     def aim_alignment(self):
-        target = self._nearest(self.enemies + self.spawners)
+        if self.aim_target == "spawner":
+            target = self._nearest(self.spawners) or self._nearest(self.enemies)
+        else:
+            target = self._nearest(self.enemies + self.spawners)
         if target is None:
             return 0.0
         want = math.atan2(target.y - self.player.y, target.x - self.player.x)

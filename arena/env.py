@@ -9,7 +9,8 @@ from arena.settings import (
     ACTION_REPEAT, DT, FPS, HEIGHT, MAX_EPISODE_SECONDS, MAX_EPISODE_STEPS,
     OBS_SIZE, PHASE_OBS_SCALE, PHASE_SPAWNERS_MAX, PLAYER_MAX_SPEED,
     REWARD_DAMAGE, REWARD_DEATH, REWARD_ENEMY, REWARD_HIT, REWARD_PHASE,
-    REWARD_SPAWNER, REWARD_STEP, SHOOT_COOLDOWN, WIDTH,
+    REWARD_SPAWNER, REWARD_SPAWNER_HIT, REWARD_STEP, SHOOT_COOLDOWN,
+    WIDTH,
 )
 
 DIAGONAL = math.hypot(WIDTH, HEIGHT)
@@ -18,7 +19,8 @@ ROTATION_ACTIONS = ("noop", "thrust", "rotate_left", "rotate_right", "shoot")
 DIRECT_ACTIONS = ("noop", "up", "down", "left", "right", "shoot")
 
 TRACKED = ("enemies_killed", "spawners_killed", "phase_advanced",
-           "damage_taken", "hits_landed", "aimed_shots", "aim_alignment")
+           "damage_taken", "hits_landed", "spawner_hits", "aimed_shots",
+           "aim_alignment", "shots_fired")
 
 
 class ArenaEnv(gym.Env):
@@ -27,6 +29,7 @@ class ArenaEnv(gym.Env):
     DEFAULT_REWARDS = {
         "rewardStep": REWARD_STEP,
         "rewardHit": REWARD_HIT,
+        "rewardSpawnerHit": REWARD_SPAWNER_HIT,
         "rewardAim": 0.0,
         "rewardEnemy": REWARD_ENEMY,
         "rewardSpawner": REWARD_SPAWNER,
@@ -36,10 +39,12 @@ class ArenaEnv(gym.Env):
     }
 
     def __init__(self, control_style="rotation", render_mode=None, seed=None,
-                 rewards=None):
+                 rewards=None, aim_target="nearest"):
         super().__init__()
         if control_style not in ("rotation", "direct"):
             raise ValueError("control_style must be 'rotation' or 'direct'")
+        if aim_target not in ("nearest", "spawner"):
+            raise ValueError("aim_target must be 'nearest' or 'spawner'")
 
         self.control_style = control_style
         self.actions = (ROTATION_ACTIONS if control_style == "rotation"
@@ -50,8 +55,9 @@ class ArenaEnv(gym.Env):
             self.rewards.update({k: v for k, v in rewards.items()
                                  if k in self.DEFAULT_REWARDS})
 
-        self.game = Game(seed=seed)
+        self.game = Game(seed=seed, aim_target=aim_target)
         self.steps = 0
+        self.overlay = None
 
         self._screen = None
         self._font = None
@@ -77,6 +83,8 @@ class ArenaEnv(gym.Env):
             self.game.update(DT, **inputs)
             for key in TRACKED:
                 totals[key] += self.game.events.get(key, 0)
+            if self.render_mode == "human":
+                self.render()
             if self.game.over:
                 break
 
@@ -89,9 +97,6 @@ class ArenaEnv(gym.Env):
         info = dict(totals)
         info["phase"] = self.game.phase
         info["time"] = self.game.time
-
-        if self.render_mode == "human":
-            self.render()
 
         return self._observe(), reward, terminated, truncated, info
 
@@ -113,6 +118,7 @@ class ArenaEnv(gym.Env):
         reward = r["rewardStep"]
         reward += r["rewardAim"] * totals["aim_alignment"]
         reward += r["rewardHit"] * totals["hits_landed"]
+        reward += r["rewardSpawnerHit"] * totals["spawner_hits"]
         reward += r["rewardEnemy"] * totals["enemies_killed"]
         reward += r["rewardSpawner"] * totals["spawners_killed"]
         reward += r["rewardPhase"] * totals["phase_advanced"]
@@ -163,7 +169,7 @@ class ArenaEnv(gym.Env):
             return
         import pygame as pg
 
-        from arena.render import draw
+        from arena.render import draw, draw_overlay
 
         if self._screen is None:
             pg.init()
@@ -174,8 +180,10 @@ class ArenaEnv(gym.Env):
 
         pg.event.pump()
         draw(self._screen, self._font, self.game)
+        if self.overlay is not None:
+            draw_overlay(self._screen, self._font, self.game, self.overlay)
         pg.display.flip()
-        self._clock.tick(FPS / ACTION_REPEAT)
+        self._clock.tick(FPS)
 
     def close(self):
         if self._screen is not None:

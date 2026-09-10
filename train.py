@@ -60,7 +60,7 @@ def main():
     os.makedirs(LOG_DIR, exist_ok=True)
 
     env = Monitor(ArenaEnv(control_style=cfg["style"], seed=cfg["seed"],
-                           rewards=cfg))
+                           rewards=cfg, aim_target=cfg["aimTarget"]))
 
     kwargs = {
         "policy": "MlpPolicy",

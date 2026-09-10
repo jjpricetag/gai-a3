@@ -21,6 +21,7 @@ def parse_args():
     p.add_argument("--seed", type=int, default=1000)
     p.add_argument("--no-render", action="store_true")
     p.add_argument("--actions", action="store_true")
+    p.add_argument("--overlay", action="store_true")
     return p.parse_args()
 
 
@@ -36,18 +37,19 @@ def main():
 
     env = ArenaEnv(control_style=cfg.get("style", "rotation"),
                    render_mode=None if args.no_render else "human",
-                   seed=args.seed, rewards=cfg)
+                   seed=args.seed, rewards=cfg,
+                   aim_target=cfg.get("aimTarget", "nearest"))
     model = ALGOS[cfg.get("algo", "ppo")].load(args.model)
 
     returns, lengths, phases, kills, spawners, hits = [], [], [], [], [], []
-    aimed, shots, aligns = [], [], []
+    aimed, shots, aligns, sp_hits = [], [], [], []
     taken = collections.Counter()
     entropies = []
 
     for ep in range(args.episodes):
         obs, _ = env.reset(seed=args.seed + ep)
         total, steps, killed, destroyed, landed = 0.0, 0, 0, 0, 0
-        on_target, fired, align = 0, 0, 0.0
+        on_target, fired, align, sp_landed = 0, 0, 0.0, 0
         while True:
             action, _ = model.predict(obs, deterministic=True)
             taken[env.actions[int(action)]] += 1
@@ -56,15 +58,27 @@ def main():
                     obs_t = torch.as_tensor(np.asarray(obs)).unsqueeze(0).float()
                     entropies.append(
                         float(model.policy.get_distribution(obs_t).entropy().item()))
+            if args.overlay:
+                with torch.no_grad():
+                    obs_t = torch.as_tensor(np.asarray(obs)).unsqueeze(0).float()
+                    dist = model.policy.get_distribution(obs_t)
+                    env.overlay = {
+                        "actions": env.actions,
+                        "probs": dist.distribution.probs[0].numpy(),
+                        "chosen": int(action),
+                        "value": float(model.policy.predict_values(obs_t)[0]),
+                        "entropy": float(dist.entropy().item()),
+                    }
             obs, reward, terminated, truncated, info = env.step(action)
             total += reward
             steps += 1
             killed += info["enemies_killed"]
             destroyed += info["spawners_killed"]
             landed += info["hits_landed"]
+            sp_landed += info["spawner_hits"]
             on_target += info["aimed_shots"]
             align += info["aim_alignment"]
-            fired += 1 if env.actions[int(action)] == "shoot" else 0
+            fired += info["shots_fired"]
             if terminated or truncated:
                 break
         returns.append(total)
@@ -73,6 +87,7 @@ def main():
         kills.append(killed)
         spawners.append(destroyed)
         hits.append(landed)
+        sp_hits.append(sp_landed)
         aimed.append(on_target)
         shots.append(fired)
         aligns.append(align / fired if fired else 0.0)
@@ -92,6 +107,7 @@ def main():
     print("  mean aim {:.3f}   (0.32 = random heading, 1.0 = perfect)".format(
         statistics.mean(aligns)))
     print("  hits     {:.1f}".format(statistics.mean(hits)))
+    print("  sp hits  {:.1f}".format(statistics.mean(sp_hits)))
     print("  enemies  {:.1f}".format(statistics.mean(kills)))
     print("  spawners {:.1f}".format(statistics.mean(spawners)))
 

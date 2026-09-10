@@ -1,0 +1,23 @@
+{
+  "algo": "ppo",
+  "style": "rotation",
+  "timesteps": 150000,
+  "learningRate": 0.0003,
+  "entCoef": 0.01,
+  "nSteps": 2048,
+  "batchSize": 64,
+  "gamma": 0.99,
+  "netArch": [
+    64,
+    64
+  ],
+  "seed": 0,
+  "rewardStep": -0.01,
+  "rewardAim": 0.1,
+  "rewardHit": 1.0,
+  "rewardEnemy": 2.0,
+  "rewardSpawner": 5.0,
+  "rewardPhase": 10.0,
+  "rewardDamage": -1.0,
+  "rewardDeath": -10.0
+}
