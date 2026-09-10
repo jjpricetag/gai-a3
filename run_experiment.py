@@ -27,7 +27,7 @@ def main():
     parser.add_argument("--algorithm", choices=["qlearning", "sarsa"], required=True)
     parser.add_argument("--episodes", type=int, default=None, help="override config episodes")
     parser.add_argument("--out", required=True, help="CSV output path")
-    parser.add_argument("--intrinsic", action="store_true", help="use intrinsic reward (for Level 6)")
+    parser.add_argument("--no-intrinsic", action="store_true", help="disable intrinsic reward for level 6")
     args = parser.parse_args()
 
     config_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "config")
@@ -49,18 +49,22 @@ def main():
 
     env = GridWorld(layout)
     logger = EpisodeLogger()
+
+    # Intrinsic reward is ON by default for level 6, unless --no-intrinsic flag is set
+    use_intrinsic_reward = (args.level == 6 and not args.no_intrinsic)
+
     run_training(
         env, cfg, screen, clock, font,
         title=f"Level {args.level}",
         algorithm=args.algorithm,
         render=False,
         episode_callback=logger.record,
-        use_intrinsic_reward=args.intrinsic,
+        use_intrinsic_reward=use_intrinsic_reward,
     )
     pygame.quit()
 
     logger.save_csv(args.out)
-    suffix = " (with intrinsic reward)" if args.intrinsic else ""
+    suffix = " (with intrinsic reward)" if args.no_intrinsic and args.level == 6 else ""
     print(f"Saved {len(logger.episodes)} episodes to {args.out}{suffix}")
 
 
