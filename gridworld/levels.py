@@ -48,11 +48,53 @@ LEVEL3 = [
     "   A        ",
 ]
 
+# Task 4 - first monster level, simple layout with 1 monster and apples.
+# Agent must learn to avoid the monster while collecting apples.
+LEVEL4 = [
+    "S           ",
+    "            ",
+    "   A   M    ",
+    "            ",
+    "        A   ",
+    "    R R R   ",
+    "  A         ",
+    "            ",
+]
+
+# Task 4 - second monster level, more complex with 2 monsters and rocks.
+# Agents need to navigate around both monsters and obstacles.
+LEVEL5 = [
+    "S           ",
+    "   M    A   ",
+    "  R R R     ",
+    "      A     ",
+    "   R R R    ",
+    "M       A   ",
+    "  R R R     ",
+    "    A       ",
+]
+
+# Task 5 - intrinsic reward level, designed to encourage exploration.
+# Similar to Level 5 but with different layout to test curiosity-driven learning.
+LEVEL6 = [
+    "S        A  ",
+    "  R R R     ",
+    "M       A   ",
+    "  R R R     ",
+    "      M     ",
+    "  R R R     ",
+    "        A   ",
+    "  R R R   A ",
+]
+
 LEVELS = {
     0: LEVEL0,
     1: LEVEL1,
     2: LEVEL2,
     3: LEVEL3,
+    4: LEVEL4,
+    5: LEVEL5,
+    6: LEVEL6,
 }
 
 

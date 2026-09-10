@@ -12,6 +12,7 @@ COL_FIRE = (247, 140, 40)
 COL_KEY = (250, 204, 60)
 COL_CHEST_CLOSED = (168, 110, 48)
 COL_CHEST_OPEN = (70, 66, 60)
+COL_MONSTER = (200, 50, 200)
 
 
 def draw_grid(screen, font, tile_size, env: GridWorld, hud_lines):
@@ -55,6 +56,10 @@ def draw_grid(screen, font, tile_size, env: GridWorld, hud_lines):
         if (env.apple_mask >> idx) & 1:
             cx, cy = center(p)
             pygame.draw.circle(screen, COL_APPLE, (cx, cy), tile_size // 3)
+
+    for p in env.monster_positions:
+        cx, cy = center(p)
+        pygame.draw.circle(screen, COL_MONSTER, (cx, cy), tile_size // 3)
 
     ax, ay = env.agent
     pygame.draw.rect(

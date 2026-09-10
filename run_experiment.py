@@ -27,6 +27,7 @@ def main():
     parser.add_argument("--algorithm", choices=["qlearning", "sarsa"], required=True)
     parser.add_argument("--episodes", type=int, default=None, help="override config episodes")
     parser.add_argument("--out", required=True, help="CSV output path")
+    parser.add_argument("--intrinsic", action="store_true", help="use intrinsic reward (for Level 6)")
     args = parser.parse_args()
 
     config_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "config")
@@ -39,7 +40,11 @@ def main():
     layout = get_level(args.level)
     tile_size = int(cfg["tileSize"])
     screen = pygame.display.set_mode((len(layout[0]) * tile_size, len(layout) * tile_size))
-    font = pygame.font.SysFont("consolas", 18)
+    # Create a dummy font that won't be used in headless mode
+    class DummyFont:
+        def render(self, text, *args, **kwargs):
+            return pygame.Surface((0, 0))
+    font = DummyFont()
     clock = pygame.time.Clock()
 
     env = GridWorld(layout)
@@ -50,11 +55,13 @@ def main():
         algorithm=args.algorithm,
         render=False,
         episode_callback=logger.record,
+        use_intrinsic_reward=args.intrinsic,
     )
     pygame.quit()
 
     logger.save_csv(args.out)
-    print(f"Saved {len(logger.episodes)} episodes to {args.out}")
+    suffix = " (with intrinsic reward)" if args.intrinsic else ""
+    print(f"Saved {len(logger.episodes)} episodes to {args.out}{suffix}")
 
 
 if __name__ == "__main__":
