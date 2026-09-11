@@ -3,6 +3,7 @@ import pygame
 from .agents import QTable, VisitCounter, epsilon_greedy, linear_epsilon, q_learning_update, sarsa_update, compute_intrinsic_reward
 from .env import GridWorld
 from .render import draw_grid
+from .ui import Button
 
 
 def run_training(
@@ -39,6 +40,35 @@ def run_training(
     qtab = QTable()
     visit_counter = VisitCounter() if use_intrinsic_reward else None
     visualize, running = True, True
+    back_to_menu = False
+
+    # Create control buttons below grid
+    grid_width = env.w * tile_size
+    grid_height = env.h * tile_size
+
+    button_height = 40
+    button_width = 60
+    button_y = grid_height + 10
+
+    v_button = Button(
+        pygame.Rect(10, button_y, 180, button_height),
+        "Fast mode",
+        enabled=True
+    )
+    r_button = Button(
+        pygame.Rect(200, button_y, 100, button_height),
+        "Reset",
+        enabled=True
+    )
+    back_button = Button(
+        pygame.Rect(310, button_y, 80, button_height),
+        "Back",
+        enabled=True
+    )
+
+    # Resize screen to include buttons area
+    screen = pygame.display.set_mode((grid_width, grid_height + 60))
+    pygame.display.set_caption(title)
 
     for ep in range(episodes):
         s = env.reset()
@@ -54,14 +84,35 @@ def run_training(
                     running = False
                     break
                 if event.type == pygame.KEYDOWN:
-                    if event.key == pygame.K_v:
+                    key = event.key
+                    if key == pygame.K_v:
                         visualize = not visualize
-                    if event.key == pygame.K_r:
+                    elif key == pygame.K_r:
                         qtab = QTable()
                         s = env.reset()
                         env_return, steps = 0.0, 0
                         eps = linear_epsilon(ep, eps_start, eps_end, eps_decay_ep)
                         a = epsilon_greedy(qtab, s, eps) if algorithm == "sarsa" else None
+                    elif key == pygame.K_b or key == pygame.K_ESCAPE:
+                        running = False
+                        break
+                if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+                    if v_button.is_clicked(event.pos):
+                        visualize = not visualize
+                    elif r_button.is_clicked(event.pos):
+                        qtab = QTable()
+                        s = env.reset()
+                        env_return, steps = 0.0, 0
+                        eps = linear_epsilon(ep, eps_start, eps_end, eps_decay_ep)
+                        a = epsilon_greedy(qtab, s, eps) if algorithm == "sarsa" else None
+                    elif back_button.is_clicked(event.pos):
+                        back_to_menu = True
+                        running = False
+
+            # Update Fast mode button label (visualize=True means slow, visualize=False means fast)
+            fast_mode_status = "On" if not visualize else "Off"
+            v_button.label = f"Fast mode: {fast_mode_status}"
+
             if not running:
                 break
 
@@ -95,19 +146,18 @@ def run_training(
                     + (f"  Keys {env.key_count}" if env.key_positions else "")
                     + (f"  Monsters {len(env.monsters)}" if env.monsters else ""),
                     f"Return {env_return:.2f}  {title}",
-                    "V toggles fast mode. R resets.",
                 ]
                 if visualize:
-                    draw_grid(screen, font, tile_size, env, hud_lines)
+                    draw_grid(screen, font, tile_size, env, hud_lines, v_button, r_button, back_button)
                     clock.tick(fps_visual)
                 else:
                     if steps % 5 == 0:
-                        draw_grid(screen, font, tile_size, env, hud_lines)
+                        draw_grid(screen, font, tile_size, env, hud_lines, v_button, r_button, back_button)
                     clock.tick(fps_fast)
 
             if res.done or steps >= max_steps:
                 if render:
-                    draw_grid(screen, font, tile_size, env, hud_lines)
+                    draw_grid(screen, font, tile_size, env, hud_lines, v_button, r_button, back_button)
                 break
 
         if running and episode_callback is not None:
@@ -116,4 +166,5 @@ def run_training(
         if not running:
             break
 
-    return not running
+    # Return False if quitting via window close, True if going back to menu (don't quit)
+    return not back_to_menu

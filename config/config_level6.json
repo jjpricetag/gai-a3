@@ -7,5 +7,8 @@
   "epsilonDecayEpisodes": 500,
   "maxStepsPerEpisode": 250,
   "seed": 42,
-  "intrinsicRewardStrength": 0.5
+  "intrinsicRewardStrength": 0.5,
+  "tileSize": 60,
+  "fpsVisual": 30,
+  "fpsFast": 120
 }

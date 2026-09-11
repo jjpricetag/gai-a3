@@ -15,7 +15,7 @@ COL_CHEST_OPEN = (70, 66, 60)
 COL_MONSTER = (200, 50, 200)
 
 
-def draw_grid(screen, font, tile_size, env: GridWorld, hud_lines):
+def draw_grid(screen, font, tile_size, env: GridWorld, hud_lines, v_button=None, r_button=None, back_button=None):
     screen.fill(COL_BG)
 
     for x in range(env.w):
@@ -70,4 +70,12 @@ def draw_grid(screen, font, tile_size, env: GridWorld, hud_lines):
 
     for i, t in enumerate(hud_lines):
         screen.blit(font.render(t, True, COL_TEXT), (10, 8 + i * 20))
+
+    if v_button:
+        v_button.draw(screen, font)
+    if r_button:
+        r_button.draw(screen, font)
+    if back_button:
+        back_button.draw(screen, font)
+
     pygame.display.flip()

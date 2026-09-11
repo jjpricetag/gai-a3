@@ -6,5 +6,8 @@
   "epsilonEnd": 0.05,
   "epsilonDecayEpisodes": 850,
   "maxStepsPerEpisode": 300,
-  "seed": 42
+  "seed": 42,
+  "tileSize": 60,
+  "fpsVisual": 30,
+  "fpsFast": 120
 }

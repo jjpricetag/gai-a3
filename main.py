@@ -16,16 +16,66 @@ from gridworld.train import run_training
 from gridworld.ui import Button
 
 
+_font_cache = {}
+
 def get_font(size, bold=False):
-    """Dummy font - skip rendering to avoid pygame.font errors."""
-    class DummyFont:
-        def render(self, text, antialias, color):
-            w = len(text) * (size // 2)
-            h = size
-            surf = pygame.Surface((w, h))
-            surf.fill((0, 0, 0))
-            return surf
-    return DummyFont()
+    """Get font using pygame freetype."""
+    key = (size, bold)
+    if key in _font_cache:
+        return _font_cache[key]
+
+    try:
+        # Try freetype after pygame init
+        import pygame
+        import pygame.freetype
+        if not pygame.freetype.get_init():
+            pygame.freetype.init()
+        font = pygame.freetype.SysFont("Arial", size, bold=bold)
+    except:
+        try:
+            # Fallback to default font
+            import pygame
+            font = pygame.font.Font(None, size)
+        except:
+            # Last resort - use PIL
+            from PIL import Image, ImageDraw, ImageFont
+
+            class PILFont:
+                def __init__(self, sz):
+                    self.size = sz
+                    try:
+                        self.font = ImageFont.truetype("/System/Library/Fonts/Arial.ttf", sz)
+                    except:
+                        try:
+                            self.font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", sz)
+                        except:
+                            self.font = ImageFont.load_default()
+
+                def render(self, text, antialias, color):
+                    # Get proper text bounds
+                    bbox = self.font.getbbox(text)
+                    text_w = bbox[2] - bbox[0]
+                    text_h = bbox[3] - bbox[1]
+
+                    # Add padding
+                    w = max(text_w + 8, 20)
+                    h = max(text_h + 8, 20)
+
+                    img = Image.new("RGBA", (w, h), (0, 0, 0, 0))
+                    draw = ImageDraw.Draw(img)
+                    # Center text
+                    x = (w - text_w) // 2 - bbox[0]
+                    y = (h - text_h) // 2 - bbox[1]
+                    draw.text((x, y), text, font=self.font, fill=color + (255,))
+
+                    import pygame
+                    surf = pygame.image.fromstring(img.tobytes(), img.size, "RGBA")
+                    return surf
+
+            font = PILFont(size)
+
+    _font_cache[key] = font
+    return font
 
 MENU, LEVEL_SELECT, ALGO_SELECT = "menu", "level_select", "algo_select"
 
@@ -95,8 +145,8 @@ def main():
     screen = pygame.display.set_mode(WINDOW_SIZE)
     pygame.display.set_caption("GridWorld RL")
     clock = pygame.time.Clock()
-    font_title = get_font(32, bold=True)
-    font_btn = get_font(18)
+    font_title = get_font(36, bold=True)
+    font_btn = get_font(16)
 
     play_btn = Button(pygame.Rect(220, 220, 200, 50), "Play")
     exit_btn = Button(pygame.Rect(220, 290, 200, 50), "Exit")
