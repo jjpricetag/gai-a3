@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 """GridWorld RL - main menu.
 
-Title screen -> Play / Exit. Play -> pick a level -> (Levels 2-3 only)
-pick Q-Learning or SARSA -> training runs in its own window.
+Title screen -> Play / Exit. Play -> pick a level -> pick a mode (whichever
+algorithm(s) the level supports, plus "Play (WASD)" to control the agent
+yourself) -> runs in its own window.
 """
 import os
 import random
@@ -12,22 +13,20 @@ import pygame
 from gridworld.config import load_config
 from gridworld.env import GridWorld
 from gridworld.levels import LEVELS, get_level
-from gridworld.train import run_training
+from gridworld.render import effective_tile_size, window_size_for
+from gridworld.train import run_human_play, run_training
 from gridworld.ui import Button
 
 
 def get_font(size, bold=False):
-    """Dummy font - skip rendering to avoid pygame.font errors."""
-    class DummyFont:
-        def render(self, text, antialias, color):
-            w = len(text) * (size // 2)
-            h = size
-            surf = pygame.Surface((w, h))
-            surf.fill((0, 0, 0))
-            return surf
-    return DummyFont()
+    """pygame's bundled default font - always available, no OS font-lookup
+    issues (unlike SysFont, which can resolve to a broken .ttc font on some
+    Windows setups and render every glyph as a solid black box)."""
+    font = pygame.font.Font(None, size)
+    font.set_bold(bold)
+    return font
 
-MENU, LEVEL_SELECT, ALGO_SELECT = "menu", "level_select", "algo_select"
+MENU, LEVEL_SELECT, MODE_SELECT = "menu", "level_select", "mode_select"
 
 WINDOW_SIZE = (640, 520)
 NUM_LEVEL_BUTTONS = 7
@@ -49,26 +48,39 @@ LEVEL_TITLES = {
 }
 
 
-def run_level(level_id: int, algorithm: str, clock) -> bool:
-    """Launches training for a level. Returns True if the user closed the window."""
+def _setup_level(level_id: int, caption_suffix: str):
     config_dir = os.path.join(os.path.dirname(__file__), "config")
     cfg = load_config(f"config_level{level_id}.json", config_dir)
     random.seed(int(cfg["seed"]))
 
     layout = get_level(level_id)
-    tile_size = int(cfg["tileSize"])
     width_tiles, height_tiles = len(layout[0]), len(layout)
+    # Scale the tile size (and therefore every sprite) up so the grid fills
+    # the same vertical space as the HUD sidebar, instead of the sidebar
+    # dwarfing a small grid left tiny in the corner.
+    cfg["tileSize"] = effective_tile_size(height_tiles, int(cfg["tileSize"]))
 
-    screen = pygame.display.set_mode((width_tiles * tile_size, height_tiles * tile_size))
-    pygame.display.set_caption(f"GridWorld - {LEVEL_TITLES[level_id]} ({algorithm})")
+    screen = pygame.display.set_mode(window_size_for(width_tiles, height_tiles, cfg["tileSize"]))
+    pygame.display.set_caption(f"GridWorld - {LEVEL_TITLES[level_id]} ({caption_suffix})")
     font = get_font(18)
-
     env = GridWorld(layout)
+    return cfg, env, screen, font
+
+
+def run_level(level_id: int, algorithm: str, clock) -> bool:
+    """Launches training for a level. Returns True if the user closed the window."""
+    cfg, env, screen, font = _setup_level(level_id, algorithm)
     return run_training(
         env, cfg, screen, clock, font,
         title=LEVEL_TITLES[level_id],
         algorithm=algorithm,
     )
+
+
+def run_human_level(level_id: int, clock) -> bool:
+    """Launches human WASD play for a level. Returns True if the user closed the window."""
+    cfg, env, screen, font = _setup_level(level_id, "Human Play")
+    return run_human_play(env, cfg, screen, clock, font, title=LEVEL_TITLES[level_id])
 
 
 def draw_menu(screen, font_title, play_btn, exit_btn, font_btn):
@@ -90,6 +102,21 @@ def draw_buttons_screen(screen, font_title, font_btn, title_text, buttons, back_
     pygame.display.flip()
 
 
+MODE_LABELS = {"qlearning": "Q-Learning", "sarsa": "SARSA", "human": "Play (WASD)"}
+
+
+def build_mode_buttons(level_id):
+    """Q-learning/SARSA (whichever the level supports) plus human Play, always."""
+    modes = [LEVEL_FIXED_ALGORITHM[level_id]] if level_id in LEVEL_FIXED_ALGORITHM else ["qlearning", "sarsa"]
+    modes.append("human")
+    buttons = [
+        (Button(pygame.Rect(220, 160 + i * 65, 200, 50), MODE_LABELS[mode]), mode)
+        for i, mode in enumerate(modes)
+    ]
+    back_btn = Button(pygame.Rect(220, 160 + len(modes) * 65 + 15, 200, 50), "Back")
+    return buttons, back_btn
+
+
 def main():
     pygame.init()
     screen = pygame.display.set_mode(WINDOW_SIZE)
@@ -109,12 +136,9 @@ def main():
         level_buttons.append(Button(rect, label, enabled=enabled))
     level_back_btn = Button(pygame.Rect(170, 100 + NUM_LEVEL_BUTTONS * 50 + 15, 300, 40), "Back")
 
-    qlearning_btn = Button(pygame.Rect(220, 220, 200, 50), "Q-Learning")
-    sarsa_btn = Button(pygame.Rect(220, 290, 200, 50), "SARSA")
-    algo_back_btn = Button(pygame.Rect(220, 360, 200, 50), "Back")
-
     state = MENU
     selected_level = None
+    mode_buttons, mode_back_btn = [], None
     running = True
     while running:
         if state == MENU:
@@ -141,38 +165,35 @@ def main():
                         for i, btn in enumerate(level_buttons):
                             if btn.is_clicked(event.pos):
                                 selected_level = i
-                                if i in LEVEL_FIXED_ALGORITHM:
-                                    quit_requested = run_level(i, LEVEL_FIXED_ALGORITHM[i], clock)
-                                    if quit_requested:
-                                        running = False
-                                    else:
-                                        screen = pygame.display.set_mode(WINDOW_SIZE)
-                                        pygame.display.set_caption("GridWorld RL")
-                                else:
-                                    state = ALGO_SELECT
+                                mode_buttons, mode_back_btn = build_mode_buttons(i)
+                                state = MODE_SELECT
             clock.tick(30)
 
-        elif state == ALGO_SELECT:
+        elif state == MODE_SELECT:
             draw_buttons_screen(
                 screen, font_title, font_btn,
                 LEVEL_TITLES.get(selected_level, f"Level {selected_level}"),
-                [qlearning_btn, sarsa_btn], algo_back_btn,
+                [btn for btn, _ in mode_buttons], mode_back_btn,
             )
             for event in pygame.event.get():
                 if event.type == pygame.QUIT:
                     running = False
                 elif event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
-                    if algo_back_btn.is_clicked(event.pos):
+                    if mode_back_btn.is_clicked(event.pos):
                         state = LEVEL_SELECT
-                    elif qlearning_btn.is_clicked(event.pos) or sarsa_btn.is_clicked(event.pos):
-                        algorithm = "qlearning" if qlearning_btn.is_clicked(event.pos) else "sarsa"
-                        quit_requested = run_level(selected_level, algorithm, clock)
-                        if quit_requested:
-                            running = False
-                        else:
-                            screen = pygame.display.set_mode(WINDOW_SIZE)
-                            pygame.display.set_caption("GridWorld RL")
-                            state = LEVEL_SELECT
+                    else:
+                        for btn, mode in mode_buttons:
+                            if btn.is_clicked(event.pos):
+                                if mode == "human":
+                                    quit_requested = run_human_level(selected_level, clock)
+                                else:
+                                    quit_requested = run_level(selected_level, mode, clock)
+                                if quit_requested:
+                                    running = False
+                                else:
+                                    screen = pygame.display.set_mode(WINDOW_SIZE)
+                                    pygame.display.set_caption("GridWorld RL")
+                                    state = LEVEL_SELECT
             clock.tick(30)
 
     pygame.quit()
