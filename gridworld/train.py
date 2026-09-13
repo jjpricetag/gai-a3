@@ -200,7 +200,7 @@ def run_human_play(env: GridWorld, cfg: dict, screen, clock, font, title: str) -
         hud_lines = _build_human_hud_lines(
             title, env, round_return, last_outcome, rounds_played, wins, deaths,
         )
-        draw_grid(screen, font, tile_size, env, hud_lines)
+        draw_grid(screen, font, tile_size, env, hud_lines, flip=not show_victory)
         if show_victory:
             restart_btn = draw_victory_overlay(screen, victory_font, font)
             pygame.display.flip()

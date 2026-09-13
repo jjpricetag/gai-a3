@@ -51,7 +51,7 @@ def window_size_for(grid_width_tiles: int, grid_height_tiles: int, tile_size: in
     return width, height
 
 
-def draw_grid(screen, font, tile_size, env: GridWorld, hud_lines):
+def draw_grid(screen, font, tile_size, env: GridWorld, hud_lines, flip=True):
     screen.fill(COL_BG)
     sprites = get_sprites(tile_size)
 
@@ -96,14 +96,15 @@ def draw_grid(screen, font, tile_size, env: GridWorld, hud_lines):
     screen.blit(frame, top_left(env.agent))
 
     draw_hud_panel(screen, font, env.w * tile_size, hud_lines)
-    pygame.display.flip()
+    if flip:
+        pygame.display.flip()
 
 
 def draw_victory_overlay(screen, big_font, btn_font) -> Button:
     """Greys out the whole window, shows 'VICTORY' centered, and a Restart
     button below it. Returns the Button so the caller can hit-test clicks
-    against it. Call after draw_grid() (which already flips the display) and
-    flip again afterwards."""
+    against it. Call after draw_grid(..., flip=False) so only one frame gets
+    presented, then flip once yourself after this returns."""
     screen_w, screen_h = screen.get_size()
 
     overlay = pygame.Surface((screen_w, screen_h), pygame.SRCALPHA)
