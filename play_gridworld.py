@@ -33,13 +33,10 @@ NUM_LEVEL_BUTTONS = 7
 COL_BG = (25, 28, 34)
 COL_TEXT = (240, 240, 240)
 
-# Levels 0 and 1 use one fixed algorithm per the spec (Task 1 / Task 2).
-# Levels 2-3 let you pick either, to compare them (Task 3).
-# Levels 4-6 are Task 4 & 5 (monsters and intrinsic reward).
-LEVEL_FIXED_ALGORITHM = {0: "qlearning", 1: "sarsa", 4: "qlearning", 5: "qlearning"}
+LEVEL_FIXED_ALGORITHM = {0: "qlearning", 4: "qlearning", 5: "qlearning"}
 LEVEL_TITLES = {
     0: "Level 0 - Q-Learning",
-    1: "Level 1 - SARSA",
+    1: "Level 1 - Cliff Walk",
     2: "Level 2 - Key & Chest",
     3: "Level 3 - Key & Chest+",
     4: "Level 4 - Monster (Simple)",
@@ -55,9 +52,6 @@ def _setup_level(level_id: int, caption_suffix: str):
 
     layout = get_level(level_id)
     width_tiles, height_tiles = len(layout[0]), len(layout)
-    # Scale the tile size (and therefore every sprite) up so the grid fills
-    # the same vertical space as the HUD sidebar, instead of the sidebar
-    # dwarfing a small grid left tiny in the corner.
     cfg["tileSize"] = effective_tile_size(height_tiles, int(cfg["tileSize"]))
 
     screen = pygame.display.set_mode(window_size_for(width_tiles, height_tiles, cfg["tileSize"]))
