@@ -36,7 +36,7 @@ to the menu.
 | Level | Task | Mechanics | Algorithm |
 |---|---|---|---|
 | 0 | 1 | Apples only | Q-learning (fixed) |
-| 1 | 2 | Cliff-walk layout (fire row = short path, safe route over the top) | SARSA (fixed) |
+| 1 | 2 | Cliff-walk layout (fire row = short path, safe route over the top) | Q-learning or SARSA |
 | 2 | 3 | Multiple apples, key, chest | Q-learning or SARSA |
 | 3 | 3 | Same as Level 2 + rocks (longer route) | Q-learning or SARSA |
 | 4 | 4 | Apples + 1 wandering monster (40% move chance/step) | Q-learning or SARSA |
@@ -51,14 +51,6 @@ policies.
 
 ### Design notes
 
-- **Death reward.** The spec defines rewards for apples/keys/chests but never
-  assigns one to death. Leaving it at 0 (same as any non-rewarding step)
-  makes death indistinguishable from an ordinary move, so Q-learning/SARSA
-  have no gradient pushing them away from hazards - which makes Task 2's
-  "SARSA is more conservative near hazards" comparison impossible to actually
-  demonstrate. `DEATH_REWARD = -1.0` in [gridworld/env.py](gridworld/env.py)
-  fills that gap; it's an addition where the spec is silent, not a change to
-  a value the spec specifies.
 - **Terminal-state masking.** Both update rules zero out the bootstrap term
   (`gamma * Q(next_state)`) when the transition ends the episode - a
   terminal state has no future reward to bootstrap from. Missing this made
