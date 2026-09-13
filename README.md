@@ -220,4 +220,4 @@ logs/          TensorBoard event logs per training run
 - **Part II:** complete - arena environment, both control schemes, PPO
   models trained and evaluated, hyperparameter/reward-shaping experiments
   logged to TensorBoard.
-- **Report / video demo:** not started yet.
+- **Video demo:** Link to video demo: https://www.youtube.com/watch?v=WkwThnYnZ9E
