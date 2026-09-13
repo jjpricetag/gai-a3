@@ -1,15 +1,5 @@
 # A3 - GridWorld RL & Deep RL Arena
 
-Both parts of the assignment spec ([markdowns/spec.md](markdowns/spec.md),
-rubric in [markdowns/rubric.md](markdowns/rubric.md)):
-
-- **Part I** - Q-learning and SARSA in a visual Pygame gridworld, Tasks 1-5
-  (Levels 0-6: apples, cliff-walk hazards, keys/chests, monsters, intrinsic
-  reward).
-- **Part II** - A real-time Pygame arena with a controllable ship, enemy
-  spawners, and phase progression, trained with Stable-Baselines3 PPO across
-  both required control schemes.
-
 ## Setup
 
 ```bash
@@ -220,4 +210,4 @@ logs/          TensorBoard event logs per training run
 - **Part II:** complete - arena environment, both control schemes, PPO
   models trained and evaluated, hyperparameter/reward-shaping experiments
   logged to TensorBoard.
-- **Report / video demo:** not started yet.
+- **Video demo:** Link to video demo: https://www.youtube.com/watch?v=WkwThnYnZ9E
